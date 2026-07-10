@@ -1,6 +1,9 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 
+const chaptersModule = require("./api/chapters.js");
+const sijosaModule = require("./api/sijosa.js");
+
 const PUBLIC_ROOT = path.join(__dirname, "public");
 
 const mimeTypes = {
@@ -16,18 +19,17 @@ module.exports = async function handler(req, res) {
   req.query = Object.fromEntries(url.searchParams.entries());
 
   if (url.pathname === "/api/chapters") {
-    return loadHandler("./api/chapters")(req, res);
+    return getHandler(chaptersModule, "./api/chapters.js")(req, res);
   }
 
   if (url.pathname === "/api/sijosa") {
-    return loadHandler("./api/sijosa")(req, res);
+    return getHandler(sijosaModule, "./api/sijosa.js")(req, res);
   }
 
   return serveStatic(url.pathname, res);
 };
 
-function loadHandler(modulePath) {
-  const mod = require(modulePath);
+function getHandler(mod, modulePath) {
   const handler = typeof mod === "function" ? mod : mod.default || mod.handler;
 
   if (typeof handler !== "function") {
