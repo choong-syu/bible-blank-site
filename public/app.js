@@ -11,7 +11,9 @@ const state = {
   shuffled: false,
   blankSeed: Date.now(),
   focusIndex: 0,
-  checkedVerses: new Set()
+  checkedVerses: new Set(),
+  wrongReviewOnly: false,
+  wrongNotes: []
 };
 
 const els = {
@@ -20,6 +22,8 @@ const els = {
   chapterSelect: document.querySelector("#chapterSelect"),
   shuffleBtn: document.querySelector("#shuffleBtn"),
   randomBlankBtn: document.querySelector("#randomBlankBtn"),
+  wrongReviewBtn: document.querySelector("#wrongReviewBtn"),
+  clearWrongNotesBtn: document.querySelector("#clearWrongNotesBtn"),
   refreshSavedBtn: document.querySelector("#refreshSavedBtn"),
   savedChapterList: document.querySelector("#savedChapterList"),
   difficultyRange: document.querySelector("#difficultyRange"),
@@ -39,6 +43,7 @@ const els = {
 
 function init() {
   renderBooks();
+  state.wrongNotes = loadWrongNotes();
   bindEvents();
   updateChapters();
   loadSavedChapters();
@@ -55,18 +60,21 @@ function renderBooks() {
 function bindEvents() {
   els.versionSelect.addEventListener("change", () => {
     state.version = els.versionSelect.value;
+    state.wrongReviewOnly = false;
     loadSelectedChapter();
   });
 
   els.bookSelect.addEventListener("change", () => {
     state.bookId = els.bookSelect.value;
     state.chapter = 1;
+    state.wrongReviewOnly = false;
     updateChapters();
     loadSelectedChapter();
   });
 
   els.chapterSelect.addEventListener("change", () => {
     state.chapter = Number(els.chapterSelect.value);
+    state.wrongReviewOnly = false;
     loadSelectedChapter();
   });
 
@@ -77,6 +85,13 @@ function bindEvents() {
   });
   els.randomBlankBtn.addEventListener("click", () => {
     randomizeChapterBlanks();
+    render();
+  });
+  els.wrongReviewBtn.addEventListener("click", toggleWrongReview);
+  els.clearWrongNotesBtn.addEventListener("click", () => {
+    state.wrongNotes = [];
+    state.wrongReviewOnly = false;
+    saveWrongNotes();
     render();
   });
 
@@ -147,6 +162,7 @@ function renderSavedChapters() {
     button.addEventListener("click", () => {
       state.bookId = button.dataset.code;
       state.chapter = Number(button.dataset.chapter);
+      state.wrongReviewOnly = false;
       els.bookSelect.value = state.bookId;
       updateChapters();
       loadSelectedChapter();
@@ -175,40 +191,45 @@ async function loadSelectedChapter() {
 }
 
 function render() {
-  els.chapterTitle.textContent = state.title || "저장된 장을 고르거나 새 장을 불러오세요";
-  els.sourceLabel.textContent = state.source || "본문 대기 중";
+  updateWrongNoteControls();
+  els.chapterTitle.textContent = state.wrongReviewOnly ? "오답노트 복습" : state.title || "저장된 장을 고르거나 새 장을 불러오세요";
+  els.sourceLabel.textContent = state.wrongReviewOnly ? `${state.wrongNotes.length}개 절 다시 풀기` : state.source || "본문 대기 중";
   els.difficultyValue.textContent = `${els.difficultyRange.value}%`;
   renderProgress();
 
-  if (!state.verses.length) {
+  const visibleVerses = getVisibleVerses();
+  if (!visibleVerses.length) {
     els.verseList.innerHTML = "";
+    if (state.wrongReviewOnly) setMessage("오답노트가 비었습니다.", "틀린 절이 생기면 오답노트만 다시 풀 수 있습니다.");
     els.messageBox.classList.remove("hidden");
     return;
   }
 
   els.messageBox.classList.add("hidden");
-  const verses = getVisibleVerses();
-  els.verseList.innerHTML = verses.map(renderVerseCard).join("");
+  els.verseList.innerHTML = visibleVerses.map(renderVerseCard).join("");
   bindVerseActions();
 }
 
 function getVisibleVerses() {
+  if (state.wrongReviewOnly) return state.wrongNotes;
   return state.shuffled ? shuffle([...state.verses]) : state.verses;
 }
 
 function renderVerseCard(item) {
-  const refText = els.hideRefsCheck.checked ? "" : `${state.title} ${item.verse}절`;
+  const refText = els.hideRefsCheck.checked ? "" : `${item.title || state.title} ${item.verse}절`;
   const body = renderVerseBody(item);
+  const wrongFlag = isWrongNote(item) ? `<p class="wrong-note-flag">오답노트 필요</p>` : "";
   const actions = state.mode === "read"
     ? `<div class="verse-actions"><button data-action="speak" type="button">듣기</button></div>`
     : `<div class="verse-actions"><button data-action="check-verse" type="button">정답 체크</button><button data-action="reset-verse" type="button">빈칸 초기화</button></div>`;
 
   return `
-    <article class="verse-card" data-verse="${item.verse}">
+    <article class="verse-card${isWrongNote(item) ? " needs-review" : ""}" data-verse="${item.verse}" data-key="${escapeHtml(getVerseKey(item))}">
       <div class="verse-head">
         <span class="ref">${refText}</span>
         ${actions}
       </div>
+      ${wrongFlag}
       ${body}
     </article>
   `;
@@ -216,7 +237,7 @@ function renderVerseCard(item) {
 
 function renderVerseBody(item) {
   if (state.mode === "quiz") {
-    const original = state.checkedVerses.has(item.verse)
+    const original = state.checkedVerses.has(getVerseKey(item))
       ? makeAnswerLine(item)
       : "";
     return `<div class="quiz-line">${makeQuizTokens(item.text, item.verse).join("")}</div>${original}`;
@@ -226,9 +247,9 @@ function renderVerseBody(item) {
 }
 
 function bindVerseActions() {
+  const visibleVerses = getVisibleVerses();
   document.querySelectorAll(".verse-card").forEach((card) => {
-    const verseNumber = Number(card.dataset.verse);
-    const verse = state.verses.find((item) => item.verse === verseNumber);
+    const verse = visibleVerses.find((item) => getVerseKey(item) === card.dataset.key);
     const speakButton = card.querySelector('[data-action="speak"]');
     if (speakButton) speakButton.addEventListener("click", () => speak(verse.text));
 
@@ -236,7 +257,7 @@ function bindVerseActions() {
     if (checkButton) checkButton.addEventListener("click", () => checkVerse(card, verse));
 
     const resetButton = card.querySelector('[data-action="reset-verse"]');
-    if (resetButton) resetButton.addEventListener("click", () => resetVerse(card, verseNumber));
+    if (resetButton) resetButton.addEventListener("click", () => resetVerse(card, verse));
   });
 }
 
@@ -320,19 +341,23 @@ function makeNounHint(answer) {
 
 function checkVerse(card, verse) {
   card.querySelectorAll(".blank-input").forEach(markInput);
-  state.checkedVerses.add(verse.verse);
+  state.checkedVerses.add(getVerseKey(verse));
+  const hasWrong = Boolean(card.querySelector(".blank-input.wrong"));
+  setWrongNote(verse, hasWrong);
+  renderWrongNoteFlag(card, hasWrong);
+  updateWrongNoteControls();
 
   if (!card.querySelector(".answer-line")) {
     card.insertAdjacentHTML("beforeend", makeAnswerLine(verse));
   }
 }
 
-function resetVerse(card, verseNumber) {
+function resetVerse(card, verse) {
   card.querySelectorAll(".blank-input").forEach((input) => {
     input.value = "";
     input.classList.remove("correct", "wrong");
   });
-  state.checkedVerses.delete(verseNumber);
+  state.checkedVerses.delete(getVerseKey(verse));
   card.querySelector(".answer-line")?.remove();
 }
 
@@ -364,8 +389,75 @@ function makeAnswerLine(item) {
   return `<p class="answer-line">${html}</p>`;
 }
 
+function renderWrongNoteFlag(card, show) {
+  card.classList.toggle("needs-review", show);
+  card.querySelector(".wrong-note-flag")?.remove();
+  if (show) {
+    card.querySelector(".verse-head").insertAdjacentHTML("afterend", `<p class="wrong-note-flag">오답노트 필요</p>`);
+  }
+}
+
+function setWrongNote(verse, shouldSave) {
+  const key = getVerseKey(verse);
+  state.wrongNotes = state.wrongNotes.filter((item) => getVerseKey(item) !== key);
+
+  if (shouldSave) {
+    state.wrongNotes.push({
+      key,
+      version: state.version,
+      code: verse.code || state.bookId,
+      chapter: Number(verse.chapter || state.chapter),
+      title: verse.title || state.title,
+      verse: verse.verse,
+      text: verse.text
+    });
+  }
+
+  saveWrongNotes();
+}
+
+function isWrongNote(verse) {
+  const key = getVerseKey(verse);
+  return state.wrongNotes.some((item) => getVerseKey(item) === key);
+}
+
+function getVerseKey(verse) {
+  return verse.key || `${verse.code || state.bookId}:${Number(verse.chapter || state.chapter)}:${verse.verse}`;
+}
+
+function loadWrongNotes() {
+  try {
+    const notes = JSON.parse(localStorage.getItem("bible.wrongNotes") || "[]");
+    return Array.isArray(notes) ? notes : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveWrongNotes() {
+  localStorage.setItem("bible.wrongNotes", JSON.stringify(state.wrongNotes));
+}
+
+function updateWrongNoteControls() {
+  els.wrongReviewBtn.textContent = state.wrongReviewOnly ? `전체 장으로 돌아가기 (${state.wrongNotes.length})` : `오답노트만 풀기 (${state.wrongNotes.length})`;
+  els.wrongReviewBtn.disabled = !state.wrongReviewOnly && !state.wrongNotes.length;
+  els.clearWrongNotesBtn.disabled = !state.wrongNotes.length;
+}
+
+function toggleWrongReview() {
+  if (state.wrongReviewOnly) {
+    state.wrongReviewOnly = false;
+  } else if (state.wrongNotes.length) {
+    state.wrongReviewOnly = true;
+    state.mode = "quiz";
+    state.checkedVerses.clear();
+    els.modeTabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.mode === "quiz"));
+  }
+  render();
+}
+
 function renderProgress() {
-  const total = state.verses.length;
+  const total = getVisibleVerses().length;
   const percent = total ? 100 : 0;
   els.progressCount.textContent = `${total}절`;
   els.progressBar.style.width = `${percent}%`;

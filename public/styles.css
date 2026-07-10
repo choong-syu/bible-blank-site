@@ -140,6 +140,18 @@ select {
   gap: 10px;
 }
 
+.wrong-note-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.wrong-note-controls button {
+  min-height: 38px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
 .settings,
 .saved-box {
   display: grid;
@@ -354,6 +366,10 @@ input[type="range"] {
   background: var(--panel);
 }
 
+.verse-card.needs-review {
+  border-color: rgba(174, 68, 48, 0.45);
+}
+
 .verse-head {
   display: flex;
   align-items: center;
@@ -375,6 +391,18 @@ input[type="range"] {
   min-height: 34px;
   padding: 0 12px;
   font-size: 13px;
+}
+
+.wrong-note-flag {
+  width: fit-content;
+  margin: 0;
+  padding: 4px 8px;
+  border: 1px solid rgba(174, 68, 48, 0.28);
+  border-radius: 8px;
+  background: #fae9e6;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .verse-text {
@@ -484,6 +512,7 @@ input[type="range"] {
 
 @media (max-width: 560px) {
   .button-row,
+  .wrong-note-controls,
   .memory-strip,
   .drill-panel {
     grid-template-columns: 1fr;
