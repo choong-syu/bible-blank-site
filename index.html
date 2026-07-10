@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>말씀 빈칸 암송</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2320382f'/%3E%3Cpath d='M18 14h24a8 8 0 0 1 8 8v28H24a6 6 0 0 0-6 6V14Z' fill='%23f7f1df'/%3E%3Cpath d='M25 25h16M25 33h16M25 41h10' stroke='%23456f5b' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace">
+        <aside class="control-panel" aria-label="성경 선택 및 학습 설정">
+          <div class="brand">
+            <div class="brand-mark" aria-hidden="true">
+              <svg viewBox="0 0 48 48" role="img">
+                <path d="M8 10c0-2.2 1.8-4 4-4h24c2.2 0 4 1.8 4 4v28c0 2.2-1.8 4-4 4H12c-2.2 0-4-1.8-4-4V10Z" fill="#20382f" />
+                <path d="M15 13h16c2.8 0 5 2.2 5 5v17H18c-1.7 0-3 1.3-3 3V13Z" fill="#f7f1df" />
+                <path d="M18 18h13M18 24h13M18 30h9" stroke="#456f5b" stroke-width="2.4" stroke-linecap="round" />
+                <path d="M14 37c.4-1.8 1.8-3 4-3h18" stroke="#c48b45" stroke-width="2.4" stroke-linecap="round" />
+              </svg>
+            </div>
+            <div>
+              <p>말씀 학습 도구</p>
+              <h1>빈칸 암송</h1>
+            </div>
+          </div>
+
+          <section class="saved-box" aria-label="저장된 장 목록">
+            <div class="section-title">
+              <h2>저장된 장</h2>
+              <button id="refreshSavedBtn" type="button">새로고침</button>
+            </div>
+            <div id="savedChapterList" class="saved-list"></div>
+          </section>
+
+          <div class="field-grid">
+            <label>
+              번역본
+              <select id="versionSelect">
+                <option value="krv">개역개정</option>
+                <option value="custom">직접 입력</option>
+              </select>
+            </label>
+            <label>
+              성경
+              <select id="bookSelect"></select>
+            </label>
+            <label>
+              장
+              <select id="chapterSelect"></select>
+            </label>
+          </div>
+
+          <div class="button-row">
+            <button id="loadChapterBtn" class="primary" type="button">장 불러오기</button>
+            <button id="shuffleBtn" type="button">구절 섞기</button>
+          </div>
+
+          <div class="settings">
+            <div class="setting-line">
+              <span>빈칸 난이도</span>
+              <output id="difficultyValue">35%</output>
+            </div>
+            <input id="difficultyRange" type="range" min="10" max="90" step="5" value="35" />
+
+            <label>
+              빈칸 방식
+              <select id="blankModeSelect">
+                <option value="important">핵심 단어 우선</option>
+                <option value="random">무작위 단어</option>
+                <option value="everyNth">규칙적 간격</option>
+                <option value="longWords">긴 단어</option>
+                <option value="initialOnly">초성 힌트</option>
+                <option value="fullVerse">절 전체 암송</option>
+              </select>
+            </label>
+
+            <label class="check">
+              <input id="hideRefsCheck" type="checkbox" />
+              절 번호 가리기
+            </label>
+            <label class="check">
+              <input id="firstLetterCheck" type="checkbox" checked />
+              첫 글자 힌트 보이기
+            </label>
+            <label class="check">
+              <input id="autoRevealCheck" type="checkbox" />
+              정답 확인 때 전체 구절 보이기
+            </label>
+          </div>
+
+          <div class="import-box">
+            <div>
+              <h2>본문 붙여넣기</h2>
+              <p>자동 수집이 막힐 때는 본문을 붙여넣어 저장할 수 있습니다.</p>
+            </div>
+            <textarea id="pasteInput" placeholder="예: 1 이틀이 지나면 ...&#10;2 이르되 ..."></textarea>
+            <button id="importBtn" type="button">붙여넣은 본문 저장</button>
+          </div>
+        </aside>
+
+        <section class="study-area">
+          <header class="topbar">
+            <div>
+              <p id="sourceLabel">본문 대기 중</p>
+              <h2 id="chapterTitle">저장된 장을 고르거나 새 장을 불러오세요</h2>
+            </div>
+            <div class="mode-tabs" role="tablist" aria-label="학습 모드">
+              <button class="active" data-mode="read" type="button">읽기</button>
+              <button data-mode="memorize" type="button">암송</button>
+              <button data-mode="quiz" type="button">빈칸</button>
+            </div>
+          </header>
+
+          <section class="memory-strip" aria-label="암송 진행률">
+            <div>
+              <span id="progressCount">0 / 0</span>
+              <strong>외운 구절</strong>
+            </div>
+            <div class="progress-track">
+              <div id="progressBar"></div>
+            </div>
+            <div class="memory-actions">
+              <button id="checkAnswersBtn" type="button">정답 확인</button>
+              <button id="resetProgressBtn" type="button">초기화</button>
+            </div>
+          </section>
+
+          <section class="drill-panel" aria-label="암송 훈련">
+            <button id="focusPrevBtn" type="button">이전</button>
+            <div>
+              <p id="drillLabel">암송 훈련</p>
+              <strong id="drillText">구절을 불러오면 한 절씩 집중해서 볼 수 있습니다.</strong>
+            </div>
+            <button id="focusNextBtn" type="button">다음</button>
+          </section>
+
+          <section id="messageBox" class="message-box">
+            <h3>시작 방법</h3>
+            <p>한 번 불러온 장은 서버에 저장됩니다. 이후 접속한 사용자도 왼쪽의 저장된 장 목록에서 바로 열 수 있습니다.</p>
+          </section>
+
+          <section id="verseList" class="verse-list" aria-live="polite"></section>
+        </section>
+      </section>
+    </main>
+
+    <script src="./bible-provider.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

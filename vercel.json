@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "functions": {
+    "api/sijosa.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/sijosa",
+      "destination": "/api/sijosa.js"
+    },
+    {
+      "source": "/api/chapters",
+      "destination": "/api/chapters.js"
+    }
+  ]
+}
