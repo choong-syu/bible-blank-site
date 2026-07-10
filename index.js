@@ -1,9 +1,6 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 
-const chaptersHandler = require("./api/chapters");
-const sijosaHandler = require("./api/sijosa");
-
 const PUBLIC_ROOT = path.join(__dirname, "public");
 
 const mimeTypes = {
@@ -19,15 +16,26 @@ module.exports = async function handler(req, res) {
   req.query = Object.fromEntries(url.searchParams.entries());
 
   if (url.pathname === "/api/chapters") {
-    return chaptersHandler(req, res);
+    return loadHandler("./api/chapters")(req, res);
   }
 
   if (url.pathname === "/api/sijosa") {
-    return sijosaHandler(req, res);
+    return loadHandler("./api/sijosa")(req, res);
   }
 
   return serveStatic(url.pathname, res);
 };
+
+function loadHandler(modulePath) {
+  const mod = require(modulePath);
+  const handler = typeof mod === "function" ? mod : mod.default || mod.handler;
+
+  if (typeof handler !== "function") {
+    throw new TypeError(`${modulePath} does not export a request handler.`);
+  }
+
+  return handler;
+}
 
 async function serveStatic(pathname, res) {
   const requested = decodeURIComponent(pathname);
