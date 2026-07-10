@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Bible memorization blank quiz site using Sijosa Bible pages.",
   "main": "index.js",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "build": "node scripts/build.js",
     "start": "node scripts/local-server.js",
