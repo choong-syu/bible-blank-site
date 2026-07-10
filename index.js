@@ -22,7 +22,7 @@ module.exports = async function handler(req, res) {
     return handleChapters(req, res);
   }
 
-  if (url.pathname === "/api/sijosa") {
+  if (url.pathname === "/sijosa") {
     return handleSijosa(req, res);
   }
 

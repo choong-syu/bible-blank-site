@@ -107,7 +107,7 @@ const BibleProvider = (() => {
   async function fetchFromSijosa({ bookId, chapter, version }) {
     void version;
     const params = new URLSearchParams({ code: bookId, chapter: String(chapter) });
-    const response = await fetch(`/api/sijosa?${params.toString()}`);
+    const response = await fetch(`/sijosa?${params.toString()}`);
 
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
