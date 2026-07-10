@@ -35,6 +35,10 @@ const els = {
   progressBar: document.querySelector("#progressBar"),
   resetProgressBtn: document.querySelector("#resetProgressBtn"),
   checkAnswersBtn: document.querySelector("#checkAnswersBtn"),
+  keywordQuizBtn: document.querySelector("#keywordQuizBtn"),
+  clearWeakWordsBtn: document.querySelector("#clearWeakWordsBtn"),
+  keywordList: document.querySelector("#keywordList"),
+  weakWordList: document.querySelector("#weakWordList"),
   focusPrevBtn: document.querySelector("#focusPrevBtn"),
   focusNextBtn: document.querySelector("#focusNextBtn"),
   drillLabel: document.querySelector("#drillLabel"),
@@ -99,6 +103,8 @@ function bindEvents() {
   els.importBtn.addEventListener("click", importPastedText);
   els.resetProgressBtn.addEventListener("click", resetProgress);
   els.checkAnswersBtn.addEventListener("click", checkAnswers);
+  els.keywordQuizBtn.addEventListener("click", startKeywordQuiz);
+  els.clearWeakWordsBtn.addEventListener("click", clearWeakWords);
   els.focusPrevBtn.addEventListener("click", () => moveFocus(-1));
   els.focusNextBtn.addEventListener("click", () => moveFocus(1));
 
@@ -222,6 +228,7 @@ function render() {
   els.difficultyValue.textContent = `${els.difficultyRange.value}%`;
   renderProgress();
   renderDrill();
+  renderWordLab();
 
   if (!state.verses.length) {
     els.verseList.innerHTML = "";
@@ -344,7 +351,7 @@ function chooseBlankIndexes(eligible, blankCount, verseNumber) {
 
   return new Set(
     eligible
-      .sort((a, b) => scoreWord(b.part) - scoreWord(a.part))
+      .sort((a, b) => scoreWord(b.part) + getWordFrequency(b.part) * 6 - (scoreWord(a.part) + getWordFrequency(a.part) * 6))
       .slice(0, blankCount)
       .map(({ index }) => index)
   );
@@ -377,8 +384,10 @@ function scoreWord(word) {
 
 function checkAnswers() {
   state.answersChecked = true;
+  recordWeakWords();
   document.querySelectorAll(".blank-input, .full-verse-input").forEach(markInput);
   if (els.autoRevealCheck.checked) render();
+  else renderWordLab();
 }
 
 function markInput(input) {
@@ -388,6 +397,95 @@ function markInput(input) {
   const wrong = actual.length >= Math.min(expected.length, 2) && actual !== expected;
   input.classList.toggle("correct", correct);
   input.classList.toggle("wrong", wrong);
+}
+
+function startKeywordQuiz() {
+  state.mode = "quiz";
+  state.blankMode = "important";
+  state.answersChecked = false;
+  els.blankModeSelect.value = "important";
+  els.difficultyRange.value = Math.max(Number(els.difficultyRange.value), 45);
+  els.modeTabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.mode === "quiz"));
+  render();
+}
+
+function renderWordLab() {
+  renderKeywordList();
+  renderWeakWordList();
+}
+
+function renderKeywordList() {
+  if (!state.verses.length) {
+    els.keywordList.innerHTML = `<span class="word-chip empty">장을 선택하면 핵심 단어가 표시됩니다.</span>`;
+    return;
+  }
+
+  const words = getTopWords(12);
+  els.keywordList.innerHTML = words.length
+    ? words.map(({ word, count }) => `<span class="word-chip">${escapeHtml(word)} <strong>${count}</strong></span>`).join("")
+    : `<span class="word-chip empty">표시할 단어가 없습니다.</span>`;
+}
+
+function renderWeakWordList() {
+  const weakWords = Object.entries(loadWeakWords())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko"))
+    .slice(0, 14);
+
+  els.weakWordList.innerHTML = weakWords.length
+    ? weakWords.map(([word, count]) => `<span class="word-chip">${escapeHtml(word)} <strong>${count}</strong></span>`).join("")
+    : `<span class="word-chip empty">정답 확인 후 틀린 단어가 쌓입니다.</span>`;
+}
+
+function recordWeakWords() {
+  const weakWords = loadWeakWords();
+  document.querySelectorAll(".blank-input, .full-verse-input").forEach((input) => {
+    const expected = normalizeAnswer(input.dataset.answer);
+    const actual = normalizeAnswer(input.value);
+    if (!expected || !actual || actual === expected) return;
+    const label = input.dataset.answer;
+    weakWords[label] = (weakWords[label] || 0) + 1;
+  });
+  localStorage.setItem("bible.weakWords", JSON.stringify(weakWords));
+}
+
+function loadWeakWords() {
+  try {
+    return JSON.parse(localStorage.getItem("bible.weakWords") || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function clearWeakWords() {
+  localStorage.removeItem("bible.weakWords");
+  renderWordLab();
+}
+
+function getTopWords(limit) {
+  return Object.entries(getChapterWordFrequency())
+    .map(([word, count]) => ({ word, count, score: scoreWord(word) + count * 5 }))
+    .sort((a, b) => b.score - a.score || b.count - a.count || a.word.localeCompare(b.word, "ko"))
+    .slice(0, limit);
+}
+
+function getChapterWordFrequency() {
+  const frequency = {};
+  state.verses.forEach((verse) => {
+    extractWords(verse.text).forEach((word) => {
+      frequency[word] = (frequency[word] || 0) + 1;
+    });
+  });
+  return frequency;
+}
+
+function getWordFrequency(word) {
+  return getChapterWordFrequency()[word] || 0;
+}
+
+function extractWords(text) {
+  return (text.match(/[\p{L}\p{N}]+/gu) || [])
+    .map((word) => word.trim())
+    .filter((word) => word.length >= 2 && !/^[0-9]+$/.test(word));
 }
 
 function renderProgress() {

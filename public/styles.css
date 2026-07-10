@@ -240,7 +240,7 @@ input[type="range"] {
 
 .study-area {
   display: grid;
-  grid-template-rows: auto auto auto 1fr;
+  grid-template-rows: auto auto auto auto 1fr;
   overflow: hidden;
   border-radius: 8px;
 }
@@ -320,6 +320,67 @@ input[type="range"] {
   min-height: 36px;
   padding: 0 12px;
   font-size: 13px;
+}
+
+.word-lab {
+  display: grid;
+  gap: 12px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--line);
+  background: #fbfdf8;
+}
+
+.scope-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.scope-summary strong {
+  color: var(--deep);
+}
+
+.word-lab-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.section-title.compact h2 {
+  font-size: 14px;
+}
+
+.word-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-height: 32px;
+}
+
+.word-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.word-chip strong {
+  color: var(--leaf);
+}
+
+.word-chip.empty {
+  color: var(--muted);
+  font-weight: 600;
 }
 
 .drill-panel {
@@ -483,6 +544,7 @@ input[type="range"] {
 
   .topbar,
   .memory-strip,
+  .word-lab-grid,
   .drill-panel {
     grid-template-columns: 1fr;
     flex-direction: column;

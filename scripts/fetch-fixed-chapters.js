@@ -25,28 +25,43 @@ async function main() {
 
   try {
     for (const target of targets) {
-      const [code, chapterText] = target.split(":");
+      const [rawCode, chapterText] = target.split(":");
+      const code = rawCode.replaceAll("_", " ");
       const chapter = Number(chapterText);
 
       if (!code || !Number.isInteger(chapter) || chapter < 1) {
         throw new Error(`Invalid target: ${target}. Use Book:Chapter, e.g. Mark:14.`);
       }
 
-      const result = await scrapeChapter(browser, code, chapter);
+      const result = await scrapeChapterWithRetry(browser, code, chapter);
       const key = `${code}:${chapter}`;
       store.chapters[key] = {
         ...result,
         key,
         savedAt: new Date().toISOString()
       };
+      await writeStore(store);
       console.log(`Saved ${key}: ${result.verses.length} verses`);
     }
   } finally {
     await browser.close();
   }
 
-  await fs.mkdir(path.dirname(OUTPUT_FILE), { recursive: true });
-  await fs.writeFile(OUTPUT_FILE, `${JSON.stringify(store, null, 2)}\n`, "utf8");
+  await writeStore(store);
+}
+
+async function scrapeChapterWithRetry(browser, code, chapter) {
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await scrapeChapter(browser, code, chapter);
+    } catch (error) {
+      lastError = error;
+      console.warn(`Retry ${attempt}/3 failed for ${code}:${chapter}: ${error.message}`);
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
+    }
+  }
+  throw lastError;
 }
 
 async function scrapeChapter(browser, code, chapter) {
@@ -109,4 +124,9 @@ async function readStore() {
   } catch {
     return { chapters: {} };
   }
+}
+
+async function writeStore(store) {
+  await fs.mkdir(path.dirname(OUTPUT_FILE), { recursive: true });
+  await fs.writeFile(OUTPUT_FILE, `${JSON.stringify(store, null, 2)}\n`, "utf8");
 }
