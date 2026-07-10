@@ -9,16 +9,17 @@ const state = {
   title: "",
   source: "",
   shuffled: false,
+  blankSeed: Date.now(),
   focusIndex: 0,
-  answersChecked: false
+  checkedVerses: new Set()
 };
 
 const els = {
   versionSelect: document.querySelector("#versionSelect"),
   bookSelect: document.querySelector("#bookSelect"),
   chapterSelect: document.querySelector("#chapterSelect"),
-  loadChapterBtn: document.querySelector("#loadChapterBtn"),
   shuffleBtn: document.querySelector("#shuffleBtn"),
+  randomBlankBtn: document.querySelector("#randomBlankBtn"),
   refreshSavedBtn: document.querySelector("#refreshSavedBtn"),
   savedChapterList: document.querySelector("#savedChapterList"),
   difficultyRange: document.querySelector("#difficultyRange"),
@@ -26,19 +27,11 @@ const els = {
   blankModeSelect: document.querySelector("#blankModeSelect"),
   hideRefsCheck: document.querySelector("#hideRefsCheck"),
   firstLetterCheck: document.querySelector("#firstLetterCheck"),
-  autoRevealCheck: document.querySelector("#autoRevealCheck"),
-  pasteInput: document.querySelector("#pasteInput"),
-  importBtn: document.querySelector("#importBtn"),
+  lengthHintCheck: document.querySelector("#lengthHintCheck"),
   sourceLabel: document.querySelector("#sourceLabel"),
   chapterTitle: document.querySelector("#chapterTitle"),
   progressCount: document.querySelector("#progressCount"),
   progressBar: document.querySelector("#progressBar"),
-  resetProgressBtn: document.querySelector("#resetProgressBtn"),
-  checkAnswersBtn: document.querySelector("#checkAnswersBtn"),
-  keywordQuizBtn: document.querySelector("#keywordQuizBtn"),
-  clearWeakWordsBtn: document.querySelector("#clearWeakWordsBtn"),
-  keywordList: document.querySelector("#keywordList"),
-  weakWordList: document.querySelector("#weakWordList"),
   messageBox: document.querySelector("#messageBox"),
   verseList: document.querySelector("#verseList"),
   modeTabs: document.querySelectorAll(".mode-tabs button")
@@ -49,7 +42,7 @@ function init() {
   bindEvents();
   updateChapters();
   loadSavedChapters();
-  render();
+  loadSelectedChapter();
 }
 
 function renderBooks() {
@@ -62,22 +55,29 @@ function renderBooks() {
 function bindEvents() {
   els.versionSelect.addEventListener("change", () => {
     state.version = els.versionSelect.value;
+    loadSelectedChapter();
   });
 
   els.bookSelect.addEventListener("change", () => {
     state.bookId = els.bookSelect.value;
     state.chapter = 1;
     updateChapters();
+    loadSelectedChapter();
   });
 
   els.chapterSelect.addEventListener("change", () => {
     state.chapter = Number(els.chapterSelect.value);
+    loadSelectedChapter();
   });
 
-  els.loadChapterBtn.addEventListener("click", loadSelectedChapter);
   els.refreshSavedBtn.addEventListener("click", loadSavedChapters);
   els.shuffleBtn.addEventListener("click", () => {
     state.shuffled = !state.shuffled;
+    render();
+  });
+  els.randomBlankBtn.addEventListener("click", () => {
+    state.blankSeed = Date.now();
+    state.checkedVerses.clear();
     render();
   });
 
@@ -88,24 +88,18 @@ function bindEvents() {
 
   els.blankModeSelect.addEventListener("change", () => {
     state.blankMode = els.blankModeSelect.value;
-    state.answersChecked = false;
+    state.checkedVerses.clear();
     render();
   });
 
   els.hideRefsCheck.addEventListener("change", render);
   els.firstLetterCheck.addEventListener("change", render);
-  els.autoRevealCheck.addEventListener("change", render);
-
-  els.importBtn.addEventListener("click", importPastedText);
-  els.resetProgressBtn.addEventListener("click", resetProgress);
-  els.checkAnswersBtn.addEventListener("click", checkAnswers);
-  els.keywordQuizBtn.addEventListener("click", startKeywordQuiz);
-  els.clearWeakWordsBtn.addEventListener("click", clearWeakWords);
+  els.lengthHintCheck.addEventListener("change", render);
 
   els.modeTabs.forEach((button) => {
     button.addEventListener("click", () => {
       state.mode = button.dataset.mode;
-      state.answersChecked = false;
+      state.checkedVerses.clear();
       els.modeTabs.forEach((tab) => tab.classList.toggle("active", tab === button));
       render();
     });
@@ -169,8 +163,9 @@ async function loadSelectedChapter() {
     state.source = getSourceLabel(result.source);
     state.title = result.title || `${getBook().name} ${state.chapter}장`;
     state.shuffled = false;
+    state.blankSeed = Date.now();
     state.focusIndex = 0;
-    state.answersChecked = false;
+    state.checkedVerses.clear();
     await loadSavedChapters();
     render();
   } catch (error) {
@@ -180,48 +175,11 @@ async function loadSelectedChapter() {
   }
 }
 
-async function importPastedText() {
-  const verses = BibleProvider.parsePastedVerses(els.pasteInput.value);
-  if (!verses.length) {
-    setMessage("붙여넣은 본문을 인식하지 못했습니다.", "각 줄을 `절번호 본문` 형식으로 입력하면 가장 정확합니다.");
-    return;
-  }
-
-  state.verses = verses;
-  state.source = "직접 입력 본문";
-  state.title = `${getBook().name} ${state.chapter}장`;
-  BibleProvider.saveLocalChapter({ ...state, verses });
-
-  await saveChapterToServer({
-    source: "manual",
-    title: state.title,
-    code: state.bookId,
-    chapter: state.chapter,
-    verses
-  });
-  await loadSavedChapters();
-  render();
-}
-
-async function saveChapterToServer(chapter) {
-  const response = await fetch("/api/chapters", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(chapter)
-  });
-
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.error || "본문을 서버에 저장하지 못했습니다.");
-  }
-}
-
 function render() {
   els.chapterTitle.textContent = state.title || "저장된 장을 고르거나 새 장을 불러오세요";
   els.sourceLabel.textContent = state.source || "본문 대기 중";
   els.difficultyValue.textContent = `${els.difficultyRange.value}%`;
   renderProgress();
-  renderWordLab();
 
   if (!state.verses.length) {
     els.verseList.innerHTML = "";
@@ -244,7 +202,7 @@ function renderVerseCard(item) {
   const body = renderVerseBody(item);
   const actions = state.mode === "read"
     ? `<div class="verse-actions"><button data-action="speak" type="button">듣기</button></div>`
-    : "";
+    : `<div class="verse-actions"><button data-action="check-verse" type="button">정답 체크</button><button data-action="reset-verse" type="button">빈칸 초기화</button></div>`;
 
   return `
     <article class="verse-card" data-verse="${item.verse}">
@@ -259,7 +217,7 @@ function renderVerseCard(item) {
 
 function renderVerseBody(item) {
   if (state.mode === "quiz") {
-    const original = els.autoRevealCheck.checked && state.answersChecked
+    const original = state.checkedVerses.has(item.verse)
       ? `<p class="answer-line">${escapeHtml(item.text)}</p>`
       : "";
     return `<div class="quiz-line">${makeQuizTokens(item.text, item.verse).join("")}</div>${original}`;
@@ -274,10 +232,12 @@ function bindVerseActions() {
     const verse = state.verses.find((item) => item.verse === verseNumber);
     const speakButton = card.querySelector('[data-action="speak"]');
     if (speakButton) speakButton.addEventListener("click", () => speak(verse.text));
-  });
 
-  document.querySelectorAll(".blank-input").forEach((input) => {
-    input.addEventListener("input", () => markInput(input));
+    const checkButton = card.querySelector('[data-action="check-verse"]');
+    if (checkButton) checkButton.addEventListener("click", () => checkVerse(card, verse));
+
+    const resetButton = card.querySelector('[data-action="reset-verse"]');
+    if (resetButton) resetButton.addEventListener("click", () => resetVerse(card, verseNumber));
   });
 }
 
@@ -295,15 +255,15 @@ function makeQuizTokens(text, verseNumber) {
     if (!blankIndexes.has(index)) return `<span>${escapeHtml(part)}</span>`;
     const noun = eligible.find((item) => item.index === index).noun;
     const placeholder = makeNounHint(noun.answer);
-    const width = Math.min(190, Math.max(82, [...placeholder].length * 24));
+    const widthBasis = placeholder || noun.answer;
+    const width = Math.min(190, Math.max(82, [...widthBasis].length * 24));
     return `<span class="blank-wrap"><input class="blank-input" style="width:${width}px" data-answer="${escapeHtml(noun.answer)}" placeholder="${escapeHtml(placeholder)}" aria-label="명사 빈칸 정답 입력" />${noun.suffix ? `<span class="blank-suffix">${escapeHtml(noun.suffix)}</span>` : ""}</span>`;
   });
 }
 
 function chooseBlankIndexes(eligible, blankCount, verseNumber) {
   return new Set(
-    eligible
-      .sort((a, b) => scoreWord(b.noun.answer) + getWordFrequency(b.noun.answer) * 6 - (scoreWord(a.noun.answer) + getWordFrequency(a.noun.answer) * 6))
+    seededShuffle(eligible, state.blankSeed + verseNumber)
       .slice(0, blankCount)
       .map(({ index }) => index)
   );
@@ -346,22 +306,27 @@ function isKnownNoun(word) {
 
 function makeNounHint(answer) {
   const chars = [...answer];
-  return els.firstLetterCheck.checked
-    ? `${chars[0]}${"*".repeat(Math.max(0, chars.length - 1))}`
-    : "*".repeat(chars.length);
+  const stars = els.lengthHintCheck.checked ? "*".repeat(els.firstLetterCheck.checked ? Math.max(0, chars.length - 1) : chars.length) : "";
+  if (els.firstLetterCheck.checked) return `${chars[0]}${stars}`;
+  return stars;
 }
 
-function scoreWord(word) {
-  const commonEndings = /(은|는|이|가|을|를|에|의|와|과|도|로|으로|라|니|며|고|되|하니|하라)$/;
-  return word.length * 3 - (commonEndings.test(word) ? 4 : 0) + (/^[0-9]+$/.test(word) ? 1 : 0);
+function checkVerse(card, verse) {
+  card.querySelectorAll(".blank-input").forEach(markInput);
+  state.checkedVerses.add(verse.verse);
+
+  if (!card.querySelector(".answer-line")) {
+    card.insertAdjacentHTML("beforeend", `<p class="answer-line">${escapeHtml(verse.text)}</p>`);
+  }
 }
 
-function checkAnswers() {
-  state.answersChecked = true;
-  recordWeakWords();
-  document.querySelectorAll(".blank-input, .full-verse-input").forEach(markInput);
-  if (els.autoRevealCheck.checked) render();
-  else renderWordLab();
+function resetVerse(card, verseNumber) {
+  card.querySelectorAll(".blank-input").forEach((input) => {
+    input.value = "";
+    input.classList.remove("correct", "wrong");
+  });
+  state.checkedVerses.delete(verseNumber);
+  card.querySelector(".answer-line")?.remove();
 }
 
 function markInput(input) {
@@ -373,109 +338,11 @@ function markInput(input) {
   input.classList.toggle("wrong", wrong);
 }
 
-function startKeywordQuiz() {
-  state.mode = "quiz";
-  state.blankMode = "nouns";
-  state.answersChecked = false;
-  els.blankModeSelect.value = "nouns";
-  els.difficultyRange.value = Math.max(Number(els.difficultyRange.value), 45);
-  els.modeTabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.mode === "quiz"));
-  render();
-}
-
-function renderWordLab() {
-  renderKeywordList();
-  renderWeakWordList();
-}
-
-function renderKeywordList() {
-  if (!state.verses.length) {
-    els.keywordList.innerHTML = `<span class="word-chip empty">장을 선택하면 핵심 단어가 표시됩니다.</span>`;
-    return;
-  }
-
-  const words = getTopWords(12);
-  els.keywordList.innerHTML = words.length
-    ? words.map(({ word, count }) => `<span class="word-chip">${escapeHtml(word)} <strong>${count}</strong></span>`).join("")
-    : `<span class="word-chip empty">표시할 단어가 없습니다.</span>`;
-}
-
-function renderWeakWordList() {
-  const weakWords = Object.entries(loadWeakWords())
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko"))
-    .slice(0, 14);
-
-  els.weakWordList.innerHTML = weakWords.length
-    ? weakWords.map(([word, count]) => `<span class="word-chip">${escapeHtml(word)} <strong>${count}</strong></span>`).join("")
-    : `<span class="word-chip empty">정답 확인 후 틀린 단어가 쌓입니다.</span>`;
-}
-
-function recordWeakWords() {
-  const weakWords = loadWeakWords();
-  document.querySelectorAll(".blank-input, .full-verse-input").forEach((input) => {
-    const expected = normalizeAnswer(input.dataset.answer);
-    const actual = normalizeAnswer(input.value);
-    if (!expected || !actual || actual === expected) return;
-    const label = input.dataset.answer;
-    weakWords[label] = (weakWords[label] || 0) + 1;
-  });
-  localStorage.setItem("bible.weakWords", JSON.stringify(weakWords));
-}
-
-function loadWeakWords() {
-  try {
-    return JSON.parse(localStorage.getItem("bible.weakWords") || "{}");
-  } catch {
-    return {};
-  }
-}
-
-function clearWeakWords() {
-  localStorage.removeItem("bible.weakWords");
-  renderWordLab();
-}
-
-function getTopWords(limit) {
-  return Object.entries(getChapterWordFrequency())
-    .map(([word, count]) => ({ word, count, score: scoreWord(word) + count * 5 }))
-    .sort((a, b) => b.score - a.score || b.count - a.count || a.word.localeCompare(b.word, "ko"))
-    .slice(0, limit);
-}
-
-function getChapterWordFrequency() {
-  const frequency = {};
-  state.verses.forEach((verse) => {
-    extractWords(verse.text).forEach((word) => {
-      frequency[word] = (frequency[word] || 0) + 1;
-    });
-  });
-  return frequency;
-}
-
-function getWordFrequency(word) {
-  return getChapterWordFrequency()[word] || 0;
-}
-
-function extractWords(text) {
-  return (text.match(/[\p{L}\p{N}]+/gu) || [])
-    .map((word) => word.trim())
-    .filter((word) => word.length >= 2 && !/^[0-9]+$/.test(word));
-}
-
 function renderProgress() {
   const total = state.verses.length;
   const percent = total ? 100 : 0;
   els.progressCount.textContent = `${total}절`;
   els.progressBar.style.width = `${percent}%`;
-}
-
-function resetProgress() {
-  document.querySelectorAll(".blank-input, .full-verse-input").forEach((input) => {
-    input.value = "";
-    input.classList.remove("correct", "wrong");
-  });
-  state.answersChecked = false;
-  renderWordLab();
 }
 
 function getBook() {
