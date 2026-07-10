@@ -294,9 +294,9 @@ function makeQuizTokens(text, verseNumber) {
   return parts.map((part, index) => {
     if (!blankIndexes.has(index)) return `<span>${escapeHtml(part)}</span>`;
     const noun = eligible.find((item) => item.index === index).noun;
-    const placeholder = makeNounHint(noun.answer, noun.suffix);
+    const placeholder = makeNounHint(noun.answer);
     const width = Math.min(190, Math.max(82, [...placeholder].length * 24));
-    return `<input class="blank-input" style="width:${width}px" data-answer="${escapeHtml(noun.answer)}" placeholder="${escapeHtml(placeholder)}" aria-label="명사 빈칸 정답 입력" />`;
+    return `<span class="blank-wrap"><input class="blank-input" style="width:${width}px" data-answer="${escapeHtml(noun.answer)}" placeholder="${escapeHtml(placeholder)}" aria-label="명사 빈칸 정답 입력" />${noun.suffix ? `<span class="blank-suffix">${escapeHtml(noun.suffix)}</span>` : ""}</span>`;
   });
 }
 
@@ -344,12 +344,11 @@ function isKnownNoun(word) {
   ].includes(word);
 }
 
-function makeNounHint(answer, suffix) {
+function makeNounHint(answer) {
   const chars = [...answer];
-  const hint = els.firstLetterCheck.checked
+  return els.firstLetterCheck.checked
     ? `${chars[0]}${"*".repeat(Math.max(0, chars.length - 1))}`
     : "*".repeat(chars.length);
-  return `${hint}${suffix}`;
 }
 
 function scoreWord(word) {

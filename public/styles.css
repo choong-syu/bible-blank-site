@@ -475,6 +475,12 @@ input[type="range"] {
   line-height: 2.2;
 }
 
+.blank-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
 .blank-input {
   width: 98px;
   min-width: 78px;
@@ -484,6 +490,11 @@ input[type="range"] {
   border-bottom: 2px solid var(--leaf);
   background: #eef5ee;
   border-radius: 6px 6px 0 0;
+}
+
+.blank-suffix {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .full-verse-input {
