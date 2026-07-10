@@ -67,12 +67,7 @@
             <label>
               빈칸 방식
               <select id="blankModeSelect">
-                <option value="important">핵심 단어 우선</option>
-                <option value="random">무작위 단어</option>
-                <option value="everyNth">규칙적 간격</option>
-                <option value="longWords">긴 단어</option>
-                <option value="initialOnly">초성 힌트</option>
-                <option value="fullVerse">절 전체 암송</option>
+                <option value="nouns">명사 빈칸</option>
               </select>
             </label>
 
@@ -108,7 +103,6 @@
             </div>
             <div class="mode-tabs" role="tablist" aria-label="학습 모드">
               <button class="active" data-mode="read" type="button">읽기</button>
-              <button data-mode="memorize" type="button">암송</button>
               <button data-mode="quiz" type="button">빈칸</button>
             </div>
           </header>
@@ -116,14 +110,14 @@
           <section class="memory-strip" aria-label="암송 진행률">
             <div>
               <span id="progressCount">0 / 0</span>
-              <strong>외운 구절</strong>
+              <strong>현재 장 구절</strong>
             </div>
             <div class="progress-track">
               <div id="progressBar"></div>
             </div>
             <div class="memory-actions">
               <button id="checkAnswersBtn" type="button">정답 확인</button>
-              <button id="resetProgressBtn" type="button">초기화</button>
+              <button id="resetProgressBtn" type="button">입력 지우기</button>
             </div>
           </section>
 
@@ -148,15 +142,6 @@
                 <div id="weakWordList" class="word-chip-list"></div>
               </section>
             </div>
-          </section>
-
-          <section class="drill-panel" aria-label="암송 훈련">
-            <button id="focusPrevBtn" type="button">이전</button>
-            <div>
-              <p id="drillLabel">암송 훈련</p>
-              <strong id="drillText">구절을 불러오면 한 절씩 집중해서 볼 수 있습니다.</strong>
-            </div>
-            <button id="focusNextBtn" type="button">다음</button>
           </section>
 
           <section id="messageBox" class="message-box">

@@ -256,7 +256,7 @@ input[type="range"] {
 
 .mode-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 88px);
+  grid-template-columns: repeat(2, 88px);
   gap: 6px;
   padding: 4px;
   border: 1px solid var(--line);
@@ -437,11 +437,6 @@ input[type="range"] {
   background: var(--panel);
 }
 
-.verse-card.memorized {
-  border-color: rgba(69, 111, 91, 0.45);
-  background: #f7fbf5;
-}
-
 .verse-head {
   display: flex;
   align-items: center;
@@ -520,11 +515,6 @@ input[type="range"] {
   font-weight: 800;
 }
 
-.hidden-text {
-  filter: blur(7px);
-  user-select: none;
-}
-
 .answer-line {
   margin: 10px 0 0;
   padding: 10px 12px;
@@ -552,7 +542,7 @@ input[type="range"] {
   }
 
   .mode-tabs {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 

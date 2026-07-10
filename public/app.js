@@ -3,7 +3,7 @@ const state = {
   bookId: "Mark",
   chapter: 14,
   mode: "read",
-  blankMode: "important",
+  blankMode: "nouns",
   verses: [],
   savedChapters: [],
   title: "",
@@ -39,10 +39,6 @@ const els = {
   clearWeakWordsBtn: document.querySelector("#clearWeakWordsBtn"),
   keywordList: document.querySelector("#keywordList"),
   weakWordList: document.querySelector("#weakWordList"),
-  focusPrevBtn: document.querySelector("#focusPrevBtn"),
-  focusNextBtn: document.querySelector("#focusNextBtn"),
-  drillLabel: document.querySelector("#drillLabel"),
-  drillText: document.querySelector("#drillText"),
   messageBox: document.querySelector("#messageBox"),
   verseList: document.querySelector("#verseList"),
   modeTabs: document.querySelectorAll(".mode-tabs button")
@@ -105,8 +101,6 @@ function bindEvents() {
   els.checkAnswersBtn.addEventListener("click", checkAnswers);
   els.keywordQuizBtn.addEventListener("click", startKeywordQuiz);
   els.clearWeakWordsBtn.addEventListener("click", clearWeakWords);
-  els.focusPrevBtn.addEventListener("click", () => moveFocus(-1));
-  els.focusNextBtn.addEventListener("click", () => moveFocus(1));
 
   els.modeTabs.forEach((button) => {
     button.addEventListener("click", () => {
@@ -227,7 +221,6 @@ function render() {
   els.sourceLabel.textContent = state.source || "본문 대기 중";
   els.difficultyValue.textContent = `${els.difficultyRange.value}%`;
   renderProgress();
-  renderDrill();
   renderWordLab();
 
   if (!state.verses.length) {
@@ -247,20 +240,17 @@ function getVisibleVerses() {
 }
 
 function renderVerseCard(item) {
-  const progressKey = getProgressKey(item.verse);
-  const memorized = localStorage.getItem(progressKey) === "done";
   const refText = els.hideRefsCheck.checked ? "" : `${state.title} ${item.verse}절`;
   const body = renderVerseBody(item);
+  const actions = state.mode === "read"
+    ? `<div class="verse-actions"><button data-action="speak" type="button">듣기</button></div>`
+    : "";
 
   return `
-    <article class="verse-card${memorized ? " memorized" : ""}" data-verse="${item.verse}">
+    <article class="verse-card" data-verse="${item.verse}">
       <div class="verse-head">
         <span class="ref">${refText}</span>
-        <div class="verse-actions">
-          <button data-action="speak" type="button">듣기</button>
-          <button data-action="toggle" type="button">${state.mode === "memorize" ? "보기" : "가리기"}</button>
-          <button data-action="done" type="button">${memorized ? "외움 취소" : "외움"}</button>
-        </div>
+        ${actions}
       </div>
       ${body}
     </article>
@@ -275,27 +265,15 @@ function renderVerseBody(item) {
     return `<div class="quiz-line">${makeQuizTokens(item.text, item.verse).join("")}</div>${original}`;
   }
 
-  const hiddenClass = state.mode === "memorize" ? " hidden-text" : "";
-  return `<p class="verse-text${hiddenClass}">${escapeHtml(item.text)}</p>`;
+  return `<p class="verse-text">${escapeHtml(item.text)}</p>`;
 }
 
 function bindVerseActions() {
   document.querySelectorAll(".verse-card").forEach((card) => {
     const verseNumber = Number(card.dataset.verse);
     const verse = state.verses.find((item) => item.verse === verseNumber);
-
-    card.querySelector('[data-action="speak"]').addEventListener("click", () => speak(verse.text));
-    card.querySelector('[data-action="toggle"]').addEventListener("click", () => {
-      const text = card.querySelector(".verse-text");
-      if (text) text.classList.toggle("hidden-text");
-    });
-    card.querySelector('[data-action="done"]').addEventListener("click", () => {
-      const key = getProgressKey(verseNumber);
-      const done = localStorage.getItem(key) === "done";
-      if (done) localStorage.removeItem(key);
-      else localStorage.setItem(key, "done");
-      render();
-    });
+    const speakButton = card.querySelector('[data-action="speak"]');
+    if (speakButton) speakButton.addEventListener("click", () => speak(verse.text));
   });
 
   document.querySelectorAll(".blank-input").forEach((input) => {
@@ -304,77 +282,74 @@ function bindVerseActions() {
 }
 
 function makeQuizTokens(text, verseNumber) {
-  if (state.blankMode === "fullVerse") {
-    return [
-      `<textarea class="full-verse-input" data-answer="${escapeHtml(text)}" data-verse="${verseNumber}" aria-label="절 전체 입력"></textarea>`
-    ];
-  }
-
   const difficulty = Number(els.difficultyRange.value) / 100;
   const parts = text.match(/[가-힣A-Za-z0-9]+|[^\s가-힣A-Za-z0-9]+|\s+/g) || [];
   const eligible = parts
     .map((part, index) => ({ part, index }))
-    .filter(({ part }) => /^[가-힣A-Za-z0-9]+$/.test(part) && part.length >= 2);
+    .map((item) => ({ ...item, noun: analyzeNounToken(item.part) }))
+    .filter(({ noun }) => noun);
   const blankCount = Math.max(1, Math.round(eligible.length * difficulty));
   const blankIndexes = chooseBlankIndexes(eligible, blankCount, verseNumber);
 
   return parts.map((part, index) => {
     if (!blankIndexes.has(index)) return `<span>${escapeHtml(part)}</span>`;
-    const hint = makeHint(part);
-    const width = Math.min(170, Math.max(78, part.length * 26));
-    return `${hint}<input class="blank-input" style="width:${width}px" data-answer="${escapeHtml(part)}" aria-label="빈칸 정답 입력" />`;
+    const noun = eligible.find((item) => item.index === index).noun;
+    const placeholder = makeNounHint(noun.answer, noun.suffix);
+    const width = Math.min(190, Math.max(82, [...placeholder].length * 24));
+    return `<input class="blank-input" style="width:${width}px" data-answer="${escapeHtml(noun.answer)}" placeholder="${escapeHtml(placeholder)}" aria-label="명사 빈칸 정답 입력" />`;
   });
 }
 
 function chooseBlankIndexes(eligible, blankCount, verseNumber) {
-  if (state.blankMode === "random") {
-    return new Set(
-      seededShuffle(eligible, verseNumber)
-        .slice(0, blankCount)
-        .map(({ index }) => index)
-    );
-  }
-
-  if (state.blankMode === "everyNth") {
-    const step = Math.max(2, Math.round(1 / Math.max(0.12, Number(els.difficultyRange.value) / 100)));
-    return new Set(eligible.filter((_, index) => index % step === step - 1).map(({ index }) => index));
-  }
-
-  if (state.blankMode === "longWords") {
-    return new Set(
-      eligible
-        .sort((a, b) => b.part.length - a.part.length || scoreWord(b.part) - scoreWord(a.part))
-        .slice(0, blankCount)
-        .map(({ index }) => index)
-    );
-  }
-
   return new Set(
     eligible
-      .sort((a, b) => scoreWord(b.part) + getWordFrequency(b.part) * 6 - (scoreWord(a.part) + getWordFrequency(a.part) * 6))
+      .sort((a, b) => scoreWord(b.noun.answer) + getWordFrequency(b.noun.answer) * 6 - (scoreWord(a.noun.answer) + getWordFrequency(a.noun.answer) * 6))
       .slice(0, blankCount)
       .map(({ index }) => index)
   );
 }
 
-function makeHint(word) {
-  if (state.blankMode === "initialOnly") {
-    return `<span class="hint">${escapeHtml(getInitials(word))}</span>`;
+function analyzeNounToken(token) {
+  if (!/^[가-힣]+$/.test(token)) return null;
+
+  const suffixes = [
+    "들에게서는", "들에게도", "들에게는", "들에서는", "들에서도", "들에는", "들에도", "들로서는", "들로도",
+    "들께서는", "들께서", "들에게서", "들로부터", "들에게", "들한테", "들까지", "들부터", "들과", "들은", "들이", "들을", "들도", "들만",
+    "에게서는", "에게도", "에게는", "에서는", "에서도", "에는", "에도", "으로는", "으로도", "로서는", "로도",
+    "께서는", "께서", "에게서", "으로부터", "로부터", "에게", "한테", "에서", "으로", "라고", "대로", "들과", "과", "와", "은", "는", "이", "가", "을", "를", "도", "만", "에", "의", "께", "로"
+  ].sort((a, b) => b.length - a.length);
+
+  for (const suffix of suffixes) {
+    if (!token.endsWith(suffix) || token.length <= suffix.length) continue;
+    const answer = token.slice(0, -suffix.length);
+    return isLikelyNoun(answer) ? { answer, suffix } : null;
   }
 
-  if (!els.firstLetterCheck.checked) return "";
-  return `<span class="hint">${escapeHtml(word[0])}</span>`;
+  if (isKnownNoun(token)) return { answer: token, suffix: "" };
+  return null;
 }
 
-function getInitials(word) {
-  const initials = ["ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
-  return [...word]
-    .map((char) => {
-      const code = char.charCodeAt(0) - 0xac00;
-      if (code < 0 || code > 11171) return char[0];
-      return initials[Math.floor(code / 588)];
-    })
-    .join("");
+function isLikelyNoun(word) {
+  if (!word || [...word].length < 2) return false;
+  if (["너희", "우리", "그들", "자기", "어디", "무엇", "아무"].includes(word)) return false;
+  if (/(하기|되기|가기|오기|먹기|보기|주기|받기|말하기|준비하기)$/.test(word)) return false;
+  if (/[하되시었였겠더라니며고서]$/.test(word)) return false;
+  return true;
+}
+
+function isKnownNoun(word) {
+  return [
+    "예수", "그리스도", "하나님", "성령", "아버지", "주", "복음", "말씀", "제자", "베드로", "요한", "야고보", "유다",
+    "갈릴리", "예루살렘", "성전", "대제사장", "서기관", "바리새인", "사람", "무리", "천국", "하늘", "땅", "믿음", "사랑", "죄", "생명", "진리"
+  ].includes(word);
+}
+
+function makeNounHint(answer, suffix) {
+  const chars = [...answer];
+  const hint = els.firstLetterCheck.checked
+    ? `${chars[0]}${"*".repeat(Math.max(0, chars.length - 1))}`
+    : "*".repeat(chars.length);
+  return `${hint}${suffix}`;
 }
 
 function scoreWord(word) {
@@ -401,9 +376,9 @@ function markInput(input) {
 
 function startKeywordQuiz() {
   state.mode = "quiz";
-  state.blankMode = "important";
+  state.blankMode = "nouns";
   state.answersChecked = false;
-  els.blankModeSelect.value = "important";
+  els.blankModeSelect.value = "nouns";
   els.difficultyRange.value = Math.max(Number(els.difficultyRange.value), 45);
   els.modeTabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.mode === "quiz"));
   render();
@@ -490,39 +465,18 @@ function extractWords(text) {
 
 function renderProgress() {
   const total = state.verses.length;
-  const done = state.verses.filter((item) => localStorage.getItem(getProgressKey(item.verse)) === "done").length;
-  const percent = total ? Math.round((done / total) * 100) : 0;
-  els.progressCount.textContent = `${done} / ${total}`;
+  const percent = total ? 100 : 0;
+  els.progressCount.textContent = `${total}절`;
   els.progressBar.style.width = `${percent}%`;
 }
 
-function renderDrill() {
-  if (!state.verses.length) {
-    els.drillLabel.textContent = "암송 훈련";
-    els.drillText.textContent = "구절을 불러오면 한 절씩 집중해서 볼 수 있습니다.";
-    return;
-  }
-
-  const verse = state.verses[state.focusIndex] || state.verses[0];
-  els.drillLabel.textContent = `${state.title} ${verse.verse}절`;
-  els.drillText.textContent = verse.text;
-}
-
-function moveFocus(delta) {
-  if (!state.verses.length) return;
-  state.focusIndex = (state.focusIndex + delta + state.verses.length) % state.verses.length;
-  renderDrill();
-  const target = document.querySelector(`[data-verse="${state.verses[state.focusIndex].verse}"]`);
-  if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
-}
-
 function resetProgress() {
-  state.verses.forEach((item) => localStorage.removeItem(getProgressKey(item.verse)));
-  render();
-}
-
-function getProgressKey(verse) {
-  return `bible.progress.${state.version}.${state.bookId}.${state.chapter}.${verse}`;
+  document.querySelectorAll(".blank-input, .full-verse-input").forEach((input) => {
+    input.value = "";
+    input.classList.remove("correct", "wrong");
+  });
+  state.answersChecked = false;
+  renderWordLab();
 }
 
 function getBook() {
