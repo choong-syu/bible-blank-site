@@ -6,7 +6,8 @@ const { chromium } = require("playwright");
 
 const PORT = Number(process.env.PORT || 5174);
 const HOST = process.env.HOST || "127.0.0.1";
-const ROOT = __dirname;
+const ROOT = path.resolve(__dirname, "..");
+const PUBLIC_ROOT = path.join(ROOT, "public");
 const DATA_DIR = path.join(ROOT, "data");
 const CHAPTER_STORE = path.join(DATA_DIR, "chapters.json");
 const SIJOSA_BASE = "https://www.sijosa.com/ch21/bible.php";
@@ -253,9 +254,9 @@ async function findChrome() {
 async function serveStatic(url, res) {
   const requested = decodeURIComponent(url.pathname);
   const relativePath = requested === "/" ? "index.html" : requested.replace(/^\/+/, "");
-  const filePath = path.resolve(ROOT, relativePath);
+  const filePath = path.resolve(PUBLIC_ROOT, relativePath);
 
-  if (!filePath.startsWith(ROOT)) {
+  if (!filePath.startsWith(PUBLIC_ROOT)) {
     res.writeHead(403);
     res.end("Forbidden");
     return;
