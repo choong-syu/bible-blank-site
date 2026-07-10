@@ -243,7 +243,7 @@ function renderVerseBody(item) {
     return `<div class="quiz-line">${makeQuizTokens(item.text, item.verse).join("")}</div>${original}`;
   }
 
-  return `<p class="verse-text">${escapeHtml(item.text)}</p>`;
+  return `<p class="verse-text">${makeReadTokens(item).join("")}</p>`;
 }
 
 function bindVerseActions() {
@@ -277,7 +277,26 @@ function makeQuizTokens(text, verseNumber) {
     const placeholder = makeNounHint(noun.answer);
     const widthBasis = placeholder || noun.answer;
     const width = Math.min(190, Math.max(82, [...widthBasis].length * 24));
-    return `<span class="blank-wrap"><input class="blank-input" style="width:${width}px" data-answer="${escapeHtml(noun.answer)}" placeholder="${escapeHtml(placeholder)}" aria-label="명사 빈칸 정답 입력" />${noun.suffix ? `<span class="blank-suffix">${escapeHtml(noun.suffix)}</span>` : ""}</span>`;
+    return `<span class="blank-wrap"><input class="blank-input" style="width:${width}px" data-answer="${escapeHtml(noun.answer)}" data-token-index="${index}" placeholder="${escapeHtml(placeholder)}" aria-label="명사 빈칸 정답 입력" />${noun.suffix ? `<span class="blank-suffix">${escapeHtml(noun.suffix)}</span>` : ""}</span>`;
+  });
+}
+
+function makeReadTokens(item) {
+  const wrongNote = getWrongNote(item);
+  const wrongIndexes = new Set((wrongNote?.wrongIndexes || []).map(Number));
+  const wrongWords = new Set(wrongNote?.wrongWords || []);
+  const parts = item.text.match(/[가-힣A-Za-z0-9]+|[^\s가-힣A-Za-z0-9]+|\s+/g) || [];
+
+  return parts.map((part, index) => {
+    const noun = analyzeNounToken(part);
+    if (!noun) return escapeHtml(part);
+
+    const markedWrong = wrongIndexes.has(index) || (!wrongIndexes.size && wrongWords.has(noun.answer));
+    const nounHtml = `<strong class="read-noun">${escapeHtml(noun.answer)}</strong>`;
+    const markedNoun = markedWrong
+      ? `<span class="read-wrong-noun"><span class="read-wrong-label">오답</span>${nounHtml}</span>`
+      : nounHtml;
+    return `${markedNoun}${escapeHtml(noun.suffix)}`;
   });
 }
 
@@ -342,8 +361,11 @@ function makeNounHint(answer) {
 function checkVerse(card, verse) {
   card.querySelectorAll(".blank-input").forEach(markInput);
   state.checkedVerses.add(getVerseKey(verse));
-  const hasWrong = Boolean(card.querySelector(".blank-input.wrong"));
-  setWrongNote(verse, hasWrong);
+  const wrongInputs = [...card.querySelectorAll(".blank-input.wrong")];
+  const hasWrong = Boolean(wrongInputs.length);
+  const wrongWords = [...new Set(wrongInputs.map((input) => input.dataset.answer).filter(Boolean))];
+  const wrongIndexes = [...new Set(wrongInputs.map((input) => Number(input.dataset.tokenIndex)).filter(Number.isFinite))];
+  setWrongNote(verse, hasWrong, { wrongWords, wrongIndexes });
   renderWrongNoteFlag(card, hasWrong);
   updateWrongNoteControls();
 
@@ -397,7 +419,7 @@ function renderWrongNoteFlag(card, show) {
   }
 }
 
-function setWrongNote(verse, shouldSave) {
+function setWrongNote(verse, shouldSave, detail = {}) {
   const key = getVerseKey(verse);
   state.wrongNotes = state.wrongNotes.filter((item) => getVerseKey(item) !== key);
 
@@ -409,7 +431,9 @@ function setWrongNote(verse, shouldSave) {
       chapter: Number(verse.chapter || state.chapter),
       title: verse.title || state.title,
       verse: verse.verse,
-      text: verse.text
+      text: verse.text,
+      wrongWords: detail.wrongWords || [],
+      wrongIndexes: detail.wrongIndexes || []
     });
   }
 
@@ -417,8 +441,12 @@ function setWrongNote(verse, shouldSave) {
 }
 
 function isWrongNote(verse) {
+  return Boolean(getWrongNote(verse));
+}
+
+function getWrongNote(verse) {
   const key = getVerseKey(verse);
-  return state.wrongNotes.some((item) => getVerseKey(item) === key);
+  return state.wrongNotes.find((item) => getVerseKey(item) === key);
 }
 
 function getVerseKey(verse) {

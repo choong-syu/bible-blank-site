@@ -412,6 +412,30 @@ input[type="range"] {
   word-break: keep-all;
 }
 
+.read-noun {
+  color: var(--deep);
+  font-weight: 900;
+}
+
+.read-wrong-noun {
+  display: inline-flex;
+  position: relative;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 12px;
+  color: var(--danger);
+  line-height: 1.1;
+  vertical-align: baseline;
+}
+
+.read-wrong-label {
+  color: var(--danger);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+
 .quiz-line {
   display: flex;
   flex-wrap: wrap;
