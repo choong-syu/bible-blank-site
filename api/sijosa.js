@@ -1,12 +1,10 @@
-const chromium = require("@sparticuz/chromium");
-const { chromium: playwright } = require("playwright-core");
-
 const SIJOSA_BASE = "https://www.sijosa.com/ch21/bible.php";
 const VERSION_INDEX = "451";
 
 module.exports = async function handler(req, res) {
-  const code = String(req.query.code || "Mark");
-  const chapter = Number(req.query.chapter || 14);
+  const query = req.query || Object.fromEntries(new URL(req.url, "https://localhost").searchParams.entries());
+  const code = String(query.code || "Mark");
+  const chapter = Number(query.chapter || 14);
 
   if (!/^[1-3]? ?[A-Za-z]+(?: [A-Za-z]+)*$/.test(code)) {
     sendJson(res, 400, { error: "Invalid book code." });
@@ -20,6 +18,9 @@ module.exports = async function handler(req, res) {
 
   let browser;
   try {
+    const chromium = require("@sparticuz/chromium");
+    const { chromium: playwright } = require("playwright-core");
+
     browser = await playwright.launch({
       args: chromium.args,
       executablePath: await chromium.executablePath(),
@@ -72,9 +73,8 @@ module.exports = async function handler(req, res) {
       fetchedAt: new Date().toISOString()
     });
   } catch (error) {
-    sendJson(res, 500, {
-      error: `시조사 성경 페이지 수집에 실패했습니다: ${error.message}`
-    });
+    console.error(error);
+    sendJson(res, 500, { error: `Failed to scrape Sijosa Bible page: ${error.message}` });
   } finally {
     if (browser) await browser.close();
   }
