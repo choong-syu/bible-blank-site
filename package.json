@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
+    "fetch:chapters": "node scripts/fetch-fixed-chapters.js",
     "start": "node scripts/local-server.js",
     "check": "node --check index.js && node --check public/app.js && node --check public/bible-provider.js && node --check scripts/local-server.js && node --check api/chapters.js && node --check api/sijosa.js"
   },

@@ -1,7 +1,7 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 
-const CHAPTER_STORE = path.join(process.cwd(), "data", "chapters.json");
+const CHAPTER_STORE = path.join(process.cwd(), "public", "data", "chapters.json");
 
 module.exports = async function handler(req, res) {
   if (req.method === "GET") {

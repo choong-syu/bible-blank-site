@@ -166,8 +166,8 @@ async function loadSelectedChapter() {
   try {
     const result = await BibleProvider.fetchChapter(state);
     state.verses = result.verses;
-    state.source = result.source === "local" ? "로컬 저장 본문" : "시조사 재림성경 자동 수집";
-    state.title = `${getBook().name} ${state.chapter}장`;
+    state.source = getSourceLabel(result.source);
+    state.title = result.title || `${getBook().name} ${state.chapter}장`;
     state.shuffled = false;
     state.focusIndex = 0;
     state.answersChecked = false;
@@ -429,6 +429,12 @@ function getProgressKey(verse) {
 
 function getBook() {
   return BibleProvider.books.find((book) => book.id === state.bookId) || BibleProvider.books[0];
+}
+
+function getSourceLabel(source) {
+  if (source === "local") return "로컬 저장 본문";
+  if (source === "fixed") return "저장된 배포 본문";
+  return "시조사 재림성경 자동 수집";
 }
 
 function setMessage(title, detail) {

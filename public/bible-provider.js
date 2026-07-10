@@ -77,6 +77,15 @@ const BibleProvider = (() => {
       };
     }
 
+    const fixed = await loadFixedChapter(bookId, chapter);
+    if (fixed) {
+      return {
+        source: "fixed",
+        title: fixed.title,
+        verses: fixed.verses
+      };
+    }
+
     const remote = await fetchFromSijosa({ bookId, chapter, version });
     if (remote.length) {
       return {
@@ -86,6 +95,28 @@ const BibleProvider = (() => {
     }
 
     throw new Error("성경 본문을 불러오지 못했습니다. npm start로 로컬 서버를 실행했는지 확인하세요.");
+  }
+
+  let fixedStorePromise;
+
+  async function loadFixedChapter(bookId, chapter) {
+    if (!fixedStorePromise) {
+      fixedStorePromise = fetch("/data/chapters.json", { cache: "no-store" })
+        .then((response) => (response.ok ? response.json() : { chapters: {} }))
+        .catch(() => ({ chapters: {} }));
+    }
+
+    const store = await fixedStorePromise;
+    const item = store.chapters?.[`${bookId}:${chapter}`];
+    if (!item || !Array.isArray(item.verses) || !item.verses.length) return null;
+
+    return {
+      ...item,
+      verses: item.verses.map((verse) => ({
+        verse: Number(verse.verse),
+        text: verse.text
+      }))
+    };
   }
 
   function loadLocalChapter(bookId, chapter, version) {

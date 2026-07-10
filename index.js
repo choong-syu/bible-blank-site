@@ -2,7 +2,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 
 const PUBLIC_ROOT = path.join(__dirname, "public");
-const CHAPTER_STORE = path.join(__dirname, "data", "chapters.json");
+const CHAPTER_STORE = path.join(__dirname, "public", "data", "chapters.json");
 const SIJOSA_BASE = "https://www.sijosa.com/ch21/bible.php";
 const VERSION_INDEX = "451";
 

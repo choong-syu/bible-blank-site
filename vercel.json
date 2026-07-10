@@ -4,7 +4,10 @@
     "index.js": {
       "maxDuration": 60,
       "memory": 1024,
-      "includeFiles": "node_modules/@sparticuz/chromium/bin/**"
+      "includeFiles": "{node_modules/@sparticuz/chromium/bin/**,public/data/chapters.json}"
+    },
+    "api/chapters.js": {
+      "includeFiles": "public/data/chapters.json"
     },
     "api/sijosa.js": {
       "maxDuration": 60,
