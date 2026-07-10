@@ -429,6 +429,8 @@ input[type="range"] {
   border-color: var(--leaf);
   border-bottom-color: var(--leaf);
   background: #e6f3e6;
+  color: var(--deep);
+  font-weight: 800;
 }
 
 .full-verse-input.wrong,
@@ -436,6 +438,8 @@ input[type="range"] {
   border-color: var(--danger);
   border-bottom-color: var(--danger);
   background: #fae9e6;
+  color: var(--danger);
+  font-weight: 800;
 }
 
 .hint {
@@ -449,6 +453,11 @@ input[type="range"] {
   border-left: 3px solid var(--gold);
   background: #fff8e9;
   line-height: 1.6;
+}
+
+.answer-word {
+  color: var(--deep);
+  font-weight: 900;
 }
 
 @media (max-width: 940px) {

@@ -76,8 +76,7 @@ function bindEvents() {
     render();
   });
   els.randomBlankBtn.addEventListener("click", () => {
-    state.blankSeed = Date.now();
-    state.checkedVerses.clear();
+    randomizeChapterBlanks();
     render();
   });
 
@@ -218,7 +217,7 @@ function renderVerseCard(item) {
 function renderVerseBody(item) {
   if (state.mode === "quiz") {
     const original = state.checkedVerses.has(item.verse)
-      ? `<p class="answer-line">${escapeHtml(item.text)}</p>`
+      ? makeAnswerLine(item)
       : "";
     return `<div class="quiz-line">${makeQuizTokens(item.text, item.verse).join("")}</div>${original}`;
   }
@@ -242,13 +241,13 @@ function bindVerseActions() {
 }
 
 function makeQuizTokens(text, verseNumber) {
-  const difficulty = Number(els.difficultyRange.value) / 100;
+  const blankPercent = Number(els.difficultyRange.value) / 100;
   const parts = text.match(/[가-힣A-Za-z0-9]+|[^\s가-힣A-Za-z0-9]+|\s+/g) || [];
   const eligible = parts
     .map((part, index) => ({ part, index }))
     .map((item) => ({ ...item, noun: analyzeNounToken(item.part) }))
     .filter(({ noun }) => noun);
-  const blankCount = Math.max(1, Math.round(eligible.length * difficulty));
+  const blankCount = Math.round(eligible.length * blankPercent);
   const blankIndexes = chooseBlankIndexes(eligible, blankCount, verseNumber);
 
   return parts.map((part, index) => {
@@ -262,11 +261,19 @@ function makeQuizTokens(text, verseNumber) {
 }
 
 function chooseBlankIndexes(eligible, blankCount, verseNumber) {
+  if (!blankCount) return new Set();
   return new Set(
     seededShuffle(eligible, state.blankSeed + verseNumber)
       .slice(0, blankCount)
       .map(({ index }) => index)
   );
+}
+
+function randomizeChapterBlanks() {
+  state.blankSeed = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+  state.checkedVerses.clear();
+  state.mode = "quiz";
+  els.modeTabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.mode === "quiz"));
 }
 
 function analyzeNounToken(token) {
@@ -316,7 +323,7 @@ function checkVerse(card, verse) {
   state.checkedVerses.add(verse.verse);
 
   if (!card.querySelector(".answer-line")) {
-    card.insertAdjacentHTML("beforeend", `<p class="answer-line">${escapeHtml(verse.text)}</p>`);
+    card.insertAdjacentHTML("beforeend", makeAnswerLine(verse));
   }
 }
 
@@ -332,10 +339,29 @@ function resetVerse(card, verseNumber) {
 function markInput(input) {
   const expected = normalizeAnswer(input.dataset.answer);
   const actual = normalizeAnswer(input.value);
-  const correct = actual && actual === expected;
-  const wrong = actual.length >= Math.min(expected.length, 2) && actual !== expected;
+  const correct = Boolean(expected) && actual === expected;
+  const wrong = !correct;
   input.classList.toggle("correct", correct);
   input.classList.toggle("wrong", wrong);
+}
+
+function makeAnswerLine(item) {
+  const parts = item.text.match(/[가-힣A-Za-z0-9]+|[^\s가-힣A-Za-z0-9]+|\s+/g) || [];
+  const eligible = parts
+    .map((part, index) => ({ part, index }))
+    .map((entry) => ({ ...entry, noun: analyzeNounToken(entry.part) }))
+    .filter(({ noun }) => noun);
+  const blankPercent = Number(els.difficultyRange.value) / 100;
+  const blankCount = Math.round(eligible.length * blankPercent);
+  const blankIndexes = chooseBlankIndexes(eligible, blankCount, item.verse);
+
+  const html = parts.map((part, index) => {
+    if (!blankIndexes.has(index)) return escapeHtml(part);
+    const noun = eligible.find((entry) => entry.index === index).noun;
+    return `<strong class="answer-word">${escapeHtml(noun.answer)}</strong>${escapeHtml(noun.suffix)}`;
+  }).join("");
+
+  return `<p class="answer-line">${html}</p>`;
 }
 
 function renderProgress() {
